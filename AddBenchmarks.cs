@@ -1,152 +1,284 @@
 ﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
+using System.ComponentModel;
+using System.Numerics;
 using System.Numerics.Tensors;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace ParallelSimd;
 
 [Config(typeof(VectorizationConfig))]
 [GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
 [CategoriesColumn]
+[MemoryDiagnoser]
+[MemoryRandomization]
 public class AddBenchmarks
 {
-    short[]? sourceShort, otherShort, resultShort;
-    int[]? sourceInt, otherInt, resultInt;
-    long[]? sourceLong, otherLong, resultLong;
-    Half[]? sourceHalf, otherHalf, resultHalf;
-    float[]? sourceFloat, otherFloat, resultFloat;
-    double[]? sourceDouble, otherDouble, resultDouble;
+    float[]? sourceSingle, otherSingle, resultSingle;
+    int[]? sourceInt32, otherInt32, resultInt32;
 
-    [Params(1_000, 10_000, 100_000)]
+    [Params(111_111)]
     public int Count { get; set; }
 
     [GlobalSetup]
     public void GlobalSetup()
     {
-        sourceShort = new short[Count];
-        otherShort = new short[Count];
-        resultShort = new short[Count];
-        sourceInt = new int[Count];
-        otherInt = new int[Count];
-        resultInt = new int[Count];
-        sourceLong = new long[Count];
-        otherLong = new long[Count];
-        resultLong = new long[Count];
-        sourceHalf = new Half[Count];
-        otherHalf = new Half[Count];
-        resultHalf = new Half[Count];
-        sourceFloat = new float[Count];
-        otherFloat = new float[Count];
-        resultFloat = new float[Count];
-        sourceDouble = new double[Count];
-        otherDouble = new double[Count];
-        resultDouble = new double[Count];
+        sourceSingle = new float[Count];
+        otherSingle = new float[Count];
+        resultSingle = new float[Count];
+
+        sourceInt32 = new int[Count];
+        otherInt32 = new int[Count];
+        resultInt32 = new int[Count];
 
         var random = new Random(42);
         for (var index = 0; index < Count; index++)
         {
-            var value = random.Next(10);
-            sourceShort[index] = (short)value;
-            otherShort[index] = (short)value;
-            sourceInt[index] = value;
-            otherInt[index] = value;
-            sourceLong[index] = value;
-            otherLong[index] = value;
-            sourceHalf[index] = (Half)value;
-            otherHalf[index] = (Half)value;
-            sourceFloat[index] = value;
-            otherFloat[index] = value;
-            sourceDouble[index] = value;
-            otherDouble[index] = value;
+            var sourceValue = random.Next(100) - 50;
+            var otherValue = random.Next(100) - 50;
+
+            sourceSingle[index] = sourceValue;
+            otherSingle[index] = otherValue;
+
+            sourceInt32[index] = sourceValue;
+            otherInt32[index] = otherValue;
         }
     }
 
-    [BenchmarkCategory("Short")]
+    [BenchmarkCategory("Single")]
     [Benchmark(Baseline = true)]
-    public void System_Short()
-        => TensorPrimitives.Add<short>(sourceShort!, otherShort!, resultShort!);
+    public void Single_For()
+        => For<float>(sourceSingle!, otherSingle!, resultSingle!);
 
-    [BenchmarkCategory("Short")]
+    [BenchmarkCategory("Single")]
     [Benchmark]
-    public void NetFabric_Short()
-        => TensorOperations.Add(sourceShort!.AsSpan(), otherShort!.AsSpan(), resultShort!.AsSpan());
+    public void Single_For_GetReference()
+        => For_GetReference<float>(sourceSingle!, otherSingle!, resultSingle!);
 
-    [BenchmarkCategory("Short")]
+    [BenchmarkCategory("Single")]
     [Benchmark]
-    public void NetFabric_Parallel_Short()
-        => TensorOperations.Add(sourceShort!, otherShort!, resultShort!);
+    public void Single_For_GetReference4()
+        => For_GetReference_4<float>(0, sourceSingle!, otherSingle!, resultSingle!);
 
-    [BenchmarkCategory("Int")]
+    [BenchmarkCategory("Single")]
+    [Benchmark]
+    public void Single_For_SIMD()
+        => For_SIMD<float>(sourceSingle!, otherSingle!, resultSingle!);
+
+    [BenchmarkCategory("Single")]
+    [Benchmark]
+    public void Single_System_Numerics_Tensor()
+        => TensorPrimitives.Add<float>(sourceSingle!, otherSingle!, resultSingle!);
+
+    [BenchmarkCategory("Single")]
+    [Benchmark]
+    public void Single_Parallel_For()
+        => Parallel_For(sourceSingle!, otherSingle!, resultSingle!);
+
+    [BenchmarkCategory("Single")]
+    [Benchmark]
+    public void Single_Parallel_Invoke()
+        => Parallel_Invoke(sourceSingle!.AsMemory(), otherSingle!.AsMemory(), resultSingle!.AsMemory());
+
+    [BenchmarkCategory("Single")]
+    [Benchmark]
+    public void Single_Parallel_Invoke_SIMD()
+        => Parallel_Invoke_SIMD(sourceSingle!.AsMemory(), otherSingle!.AsMemory(), resultSingle!.AsMemory());
+
+    [BenchmarkCategory("Int32")]
     [Benchmark(Baseline = true)]
-    public void System_Int()
-        => TensorPrimitives.Add<int>(sourceInt!, otherInt!, resultInt!);
+    public void Int32_For()
+        => For<int>(sourceInt32!, otherInt32!, resultInt32!);
 
-    [BenchmarkCategory("Int")]
+    [BenchmarkCategory("Int32")]
     [Benchmark]
-    public void NetFabric_Int()
-        => TensorOperations.Add(sourceInt!.AsSpan(), otherInt!.AsSpan(), resultInt!.AsSpan());
+    public void Int32_For_GetReference()
+        => For_GetReference<int>(sourceInt32!, otherInt32!, resultInt32!);
 
-    [BenchmarkCategory("Int")]
+    [BenchmarkCategory("Int32")]
     [Benchmark]
-    public void NetFabric_Parallel_Int()
-        => TensorOperations.Add(sourceInt!, otherInt!, resultInt!);
+    public void Int32_For_GetReference4()
+        => For_GetReference_4<int>(0, sourceInt32!, otherInt32!, resultInt32!);
 
-    [BenchmarkCategory("Long")]
-    [Benchmark(Baseline = true)]
-    public void System_Long()
-        => TensorPrimitives.Add<long>(sourceLong!, otherLong!, resultLong!);
-
-    [BenchmarkCategory("Long")]
+    [BenchmarkCategory("Int32")]
     [Benchmark]
-    public void NetFabric_Long()
-        => TensorOperations.Add(sourceLong!.AsSpan(), otherLong!.AsSpan(), resultLong!.AsSpan());
+    public void Int32_For_SIMD()
+        => For_SIMD<int>(sourceInt32!, otherInt32!, resultInt32!);
 
-    [BenchmarkCategory("Long")]
+    [BenchmarkCategory("Int32")]
     [Benchmark]
-    public void NetFabric_Parallel_Long()
-        => TensorOperations.Add(sourceLong!, otherLong!, resultLong!);
+    public void Int32_System_Numerics_Tensor()
+        => TensorPrimitives.Add<int>(sourceInt32!, otherInt32!, resultInt32!);
 
-    [BenchmarkCategory("Half")]
-    [Benchmark(Baseline = true)]
-    public void System_Half()
-        => TensorPrimitives.Add<Half>(sourceHalf!, otherHalf!, resultHalf!);
-
-    [BenchmarkCategory("Half")]
+    [BenchmarkCategory("Int32")]
     [Benchmark]
-    public void NetFabric_Half()
-        => TensorOperations.Add(sourceHalf!.AsSpan(), otherHalf!.AsSpan(), resultHalf!.AsSpan());
+    public void Int32_Parallel_For()
+        => Parallel_For(sourceInt32!, otherInt32!, resultInt32!);
 
-    [BenchmarkCategory("Half")]
+    [BenchmarkCategory("Int32")]
     [Benchmark]
-    public void NetFabric_Parallel_Half()
-        => TensorOperations.Add(sourceHalf!, otherHalf!, resultHalf!);
+    public void Int32_Parallel_Invoke()
+        => Parallel_Invoke(sourceInt32!.AsMemory(), otherInt32!.AsMemory(), resultInt32!.AsMemory());
 
-    [BenchmarkCategory("Float")]
-    [Benchmark(Baseline = true)]
-    public void System_Float()
-        => TensorPrimitives.Add<float>(sourceFloat!, otherFloat!, resultFloat!);
-
-    [BenchmarkCategory("Float")]
+    [BenchmarkCategory("Int32")]
     [Benchmark]
-    public void NetFabric_Float()
-        => TensorOperations.Add(sourceFloat!.AsSpan(), otherFloat!.AsSpan(), resultFloat!.AsSpan());
+    public void Int32_Parallel_Invoke_SIMD()
+        => Parallel_Invoke_SIMD(sourceInt32!.AsMemory(), otherInt32!.AsMemory(), resultInt32!.AsMemory());
 
-    [BenchmarkCategory("Float")]
-    [Benchmark]
-    public void NetFabric_Parallel_Float()
-        => TensorOperations.Add(sourceFloat!, otherFloat!, resultFloat!);
+    static void For<T>(ReadOnlySpan<T> left, ReadOnlySpan<T> right, Span<T> destination)
+        where T : struct, IAdditionOperators<T, T, T>
+    {
+        for (var index = 0; index < left.Length; index++)
+            destination[index] = left[index] + right[index];
+    }
 
-    [BenchmarkCategory("Double")]
-    [Benchmark(Baseline = true)]
-    public void System_Double()
-        => TensorPrimitives.Add<double>(sourceDouble!, otherDouble!, resultDouble!);
+    static void For_GetReference<T>(ReadOnlySpan<T> left, ReadOnlySpan<T> right, Span<T> destination)
+        where T : struct, IAdditionOperators<T, T, T>
+    {
+        ref var leftRef = ref MemoryMarshal.GetReference(left);
+        ref var rightRef = ref MemoryMarshal.GetReference(right);
+        ref var destinationRef = ref MemoryMarshal.GetReference(destination);
+        var end = left.Length;
+        for (var index = 0; index < end; index++)
+            Unsafe.Add(ref destinationRef, index) = Unsafe.Add(ref leftRef, index) + Unsafe.Add(ref rightRef, index);
+    }
 
-    [BenchmarkCategory("Double")]
-    [Benchmark]
-    public void NetFabric_Double()
-        => TensorOperations.Add(sourceDouble!.AsSpan(), otherDouble!.AsSpan(), resultDouble!.AsSpan());
+    static void For_GetReference_4<T>(int index, ReadOnlySpan<T> left, ReadOnlySpan<T> right, Span<T> destination)
+        where T : struct, IAdditionOperators<T, T, T>
+    {
+        ref var leftRef = ref MemoryMarshal.GetReference(left);
+        ref var rightRef = ref MemoryMarshal.GetReference(right);
+        ref var destinationRef = ref MemoryMarshal.GetReference(destination);
+        var end = left.Length - 3;
+        for (; index < end; index += 4)
+        {
+            Unsafe.Add(ref destinationRef, index) = Unsafe.Add(ref leftRef, index) + Unsafe.Add(ref rightRef, index);
+            Unsafe.Add(ref destinationRef, index + 1) = Unsafe.Add(ref leftRef, index + 1) + Unsafe.Add(ref rightRef, index + 1);
+            Unsafe.Add(ref destinationRef, index + 2) = Unsafe.Add(ref leftRef, index + 2) + Unsafe.Add(ref rightRef, index + 2);
+            Unsafe.Add(ref destinationRef, index + 3) = Unsafe.Add(ref leftRef, index + 3) + Unsafe.Add(ref rightRef, index + 3);
+        }
 
-    [BenchmarkCategory("Double")]
-    [Benchmark]
-    public void NetFabric_Parallel_Double()
-        => TensorOperations.Add(sourceDouble!, otherDouble!, resultDouble!);
+        switch (left.Length - index)
+        {
+            case 3:
+                Unsafe.Add(ref destinationRef, index) = Unsafe.Add(ref leftRef, index) + Unsafe.Add(ref rightRef, index);
+                Unsafe.Add(ref destinationRef, index + 1) = Unsafe.Add(ref leftRef, index + 1) + Unsafe.Add(ref rightRef, index + 1);
+                Unsafe.Add(ref destinationRef, index + 2) = Unsafe.Add(ref leftRef, index + 2) + Unsafe.Add(ref rightRef, index + 2);
+                break;
+            case 2:
+                Unsafe.Add(ref destinationRef, index) = Unsafe.Add(ref leftRef, index) + Unsafe.Add(ref rightRef, index);
+                Unsafe.Add(ref destinationRef, index + 1) = Unsafe.Add(ref leftRef, index + 1) + Unsafe.Add(ref rightRef, index + 1);
+                break;
+            case 1:
+                Unsafe.Add(ref destinationRef, index) = Unsafe.Add(ref leftRef, index) + Unsafe.Add(ref rightRef, index);
+                break;
+        }
+    }
+
+    static void For_SIMD<T>(ReadOnlySpan<T> left, ReadOnlySpan<T> right, Span<T> destination)
+        where T : struct, IAdditionOperators<T, T, T>
+    {
+        var indexSource = 0;
+
+        if (Vector.IsHardwareAccelerated && Vector<T>.IsSupported)
+        {
+            var leftVectors = MemoryMarshal.Cast<T, Vector<T>>(left);
+            var rightVectors = MemoryMarshal.Cast<T, Vector<T>>(right);
+            var destinationVectors = MemoryMarshal.Cast<T, Vector<T>>(destination);
+
+            ref var leftVectorsRef = ref MemoryMarshal.GetReference(leftVectors);
+            ref var rightVectorsRef = ref MemoryMarshal.GetReference(rightVectors);
+            ref var destinationVectorsRef = ref MemoryMarshal.GetReference(destinationVectors);
+            var endVectors = leftVectors.Length;
+            for (var indexVector = 0; indexVector < endVectors; indexVector++)
+            {
+                Unsafe.Add(ref destinationVectorsRef, indexVector) = Unsafe.Add(ref leftVectorsRef, indexVector) + Unsafe.Add(ref rightVectorsRef, indexVector);
+            }
+
+            indexSource = leftVectors.Length * Vector<T>.Count;
+        }
+
+        For_GetReference_4(indexSource, left, right, destination);
+    }
+
+    static void Parallel_For<T>(T[] left, T[] right, T[] destination)
+        where T : struct, IAdditionOperators<T, T, T>
+    {
+        Parallel.For(0, left.Length, index => destination[index] = left[index] + right[index]);
+    }
+
+    static void Parallel_Invoke<T>(ReadOnlyMemory<T> left, ReadOnlyMemory<T> right, Memory<T> destination)
+        where T : struct, IAdditionOperators<T, T, T>
+    {
+        const int minChunkCount = 4;
+        const int minChunkSize = 1_000;
+
+        var coreCount = Environment.ProcessorCount;
+
+        if (coreCount >= minChunkCount && left.Length > minChunkCount * minChunkSize)
+            ParallelApply(left, right, destination, coreCount);
+        else
+            For_GetReference_4(0, left.Span, right.Span, destination.Span);
+
+        static void ParallelApply(ReadOnlyMemory<T> left, ReadOnlyMemory<T> right, Memory<T> destination, int coreCount)
+        {
+            var totalSize = left.Length;
+            var chunkSize = int.Max(totalSize / coreCount, minChunkSize);
+
+            var actions = GC.AllocateArray<Action>(totalSize / chunkSize);
+            var start = 0;
+            for (var index = 0; index < actions.Length; index++)
+            {
+                var length = (index == actions.Length - 1)
+                    ? totalSize - start
+                    : chunkSize;
+
+                var leftSlice = left.Slice(start, length);
+                var rightSlice = right.Slice(start, length);
+                var destinationSlice = destination.Slice(start, length);
+                actions[index] = () => For_GetReference_4(0, leftSlice.Span, rightSlice.Span, destinationSlice.Span);
+
+                start += length;
+            }
+            Parallel.Invoke(actions);
+        }
+    }
+
+    static void Parallel_Invoke_SIMD<T>(ReadOnlyMemory<T> left, ReadOnlyMemory<T> right, Memory<T> destination)
+        where T : struct, IAdditionOperators<T, T, T>
+    {
+        const int minChunkCount = 4;
+        const int minChunkSize = 1_000;
+
+        var coreCount = Environment.ProcessorCount;
+
+        if (coreCount >= minChunkCount && left.Length > minChunkCount * minChunkSize)
+            ParallelApply(left, right, destination, coreCount);
+        else
+            For_SIMD(left.Span, right.Span, destination.Span);
+
+        static void ParallelApply(ReadOnlyMemory<T> left, ReadOnlyMemory<T> right, Memory<T> destination, int coreCount)
+        {
+            var totalSize = left.Length;
+            var chunkSize = int.Max(totalSize / coreCount, minChunkSize);
+
+            var actions = GC.AllocateArray<Action>(totalSize / chunkSize);
+            var start = 0;
+            for (var index = 0; index < actions.Length; index++)
+            {
+                var length = (index == actions.Length - 1)
+                    ? totalSize - start
+                    : chunkSize;
+
+                var leftSlice = left.Slice(start, length);
+                var rightSlice = right.Slice(start, length);
+                var destinationSlice = destination.Slice(start, length);
+                actions[index] = () => For_SIMD(leftSlice.Span, rightSlice.Span, destinationSlice.Span);
+
+                start += length;
+            }
+            Parallel.Invoke(actions);
+        }
+    }
 }
