@@ -59,7 +59,7 @@ public class AddBenchmarks
     [BenchmarkCategory("Single")]
     [Benchmark]
     public void Single_For_GetReference4()
-        => For_GetReference_4<float>(0, sourceSingle!, otherSingle!, resultSingle!);
+        => For_GetReference_4<float>(sourceSingle!, otherSingle!, resultSingle!);
 
     [BenchmarkCategory("Single")]
     [Benchmark]
@@ -99,7 +99,7 @@ public class AddBenchmarks
     [BenchmarkCategory("Int32")]
     [Benchmark]
     public void Int32_For_GetReference4()
-        => For_GetReference_4<int>(0, sourceInt32!, otherInt32!, resultInt32!);
+        => For_GetReference_4<int>(sourceInt32!, otherInt32!, resultInt32!);
 
     [BenchmarkCategory("Int32")]
     [Benchmark]
@@ -144,7 +144,7 @@ public class AddBenchmarks
             Unsafe.Add(ref destinationRef, index) = Unsafe.Add(ref leftRef, index) + Unsafe.Add(ref rightRef, index);
     }
 
-    static void For_GetReference_4<T>(int index, ReadOnlySpan<T> left, ReadOnlySpan<T> right, Span<T> destination)
+    static void For_GetReference_4<T>(ReadOnlySpan<T> left, ReadOnlySpan<T> right, Span<T> destination, int index = 0)
         where T : struct, IAdditionOperators<T, T, T>
     {
         ref var leftRef = ref MemoryMarshal.GetReference(left);
@@ -199,7 +199,7 @@ public class AddBenchmarks
             indexSource = leftVectors.Length * Vector<T>.Count;
         }
 
-        For_GetReference_4(indexSource, left, right, destination);
+        For_GetReference_4(left, right, destination, indexSource);
     }
 
     static void Parallel_For<T>(T[] left, T[] right, T[] destination)
@@ -219,7 +219,7 @@ public class AddBenchmarks
         if (coreCount >= minChunkCount && left.Length > minChunkCount * minChunkSize)
             ParallelApply(left, right, destination, coreCount);
         else
-            For_GetReference_4(0, left.Span, right.Span, destination.Span);
+            For_GetReference_4(left.Span, right.Span, destination.Span);
 
         static void ParallelApply(ReadOnlyMemory<T> left, ReadOnlyMemory<T> right, Memory<T> destination, int coreCount)
         {
@@ -237,7 +237,7 @@ public class AddBenchmarks
                 var leftSlice = left.Slice(start, length);
                 var rightSlice = right.Slice(start, length);
                 var destinationSlice = destination.Slice(start, length);
-                actions[index] = () => For_GetReference_4(0, leftSlice.Span, rightSlice.Span, destinationSlice.Span);
+                actions[index] = () => For_GetReference_4(leftSlice.Span, rightSlice.Span, destinationSlice.Span);
 
                 start += length;
             }
