@@ -1,5 +1,6 @@
 ﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
+using NetFabric.Numerics.Tensors;
 using System.Numerics;
 using System.Numerics.Tensors;
 using System.Runtime.CompilerServices;
@@ -72,6 +73,11 @@ public class AddBenchmarks
 
     [BenchmarkCategory("Single")]
     [Benchmark]
+    public void Single_NetFabric_Numerics_Tensor()
+        => TensorOperations.Add<float>(sourceSingle!, otherSingle!, resultSingle!);
+
+    [BenchmarkCategory("Single")]
+    [Benchmark]
     public void Single_Parallel_For()
         => Parallel_For(sourceSingle!, otherSingle!, resultSingle!);
 
@@ -84,6 +90,16 @@ public class AddBenchmarks
     [Benchmark]
     public void Single_Parallel_Invoke_SIMD()
         => Parallel_Invoke_SIMD(sourceSingle!.AsMemory(), otherSingle!.AsMemory(), resultSingle!.AsMemory());
+
+    [BenchmarkCategory("Single")]
+    [Benchmark]
+    public void Single_Parallel_Invoke_System_Numerics_Tensors()
+        => Parallel_Invoke_System_Numerics_Tensors(sourceSingle!.AsMemory(), otherSingle!.AsMemory(), resultSingle!.AsMemory());
+
+    [BenchmarkCategory("Single")]
+    [Benchmark]
+    public void Single_Parallel_Invoke_NetFabric_Numerics_Tensors()
+        => Parallel_Invoke_NetFabric_Numerics_Tensors(sourceSingle!.AsMemory(), otherSingle!.AsMemory(), resultSingle!.AsMemory());
 
     [BenchmarkCategory("Int32")]
     [Benchmark(Baseline = true)]
@@ -112,6 +128,11 @@ public class AddBenchmarks
 
     [BenchmarkCategory("Int32")]
     [Benchmark]
+    public void Int32_NetFabric_Numerics_Tensor()
+        => TensorOperations.Add<int>(sourceInt32!, otherInt32!, resultInt32!);
+
+    [BenchmarkCategory("Int32")]
+    [Benchmark]
     public void Int32_Parallel_For()
         => Parallel_For(sourceInt32!, otherInt32!, resultInt32!);
 
@@ -124,6 +145,16 @@ public class AddBenchmarks
     [Benchmark]
     public void Int32_Parallel_Invoke_SIMD()
         => Parallel_Invoke_SIMD(sourceInt32!.AsMemory(), otherInt32!.AsMemory(), resultInt32!.AsMemory());
+
+    [BenchmarkCategory("Int32")]
+    [Benchmark]
+    public void Int32_Parallel_Invoke_System_Numerics_Tensors()
+        => Parallel_Invoke_System_Numerics_Tensors(sourceInt32!.AsMemory(), otherInt32!.AsMemory(), resultInt32!.AsMemory());
+
+    [BenchmarkCategory("Int32")]
+    [Benchmark]
+    public void Int32_Parallel_Invoke_NetFabric_Numerics_Tensors()
+        => Parallel_Invoke_NetFabric_Numerics_Tensors(sourceInt32!.AsMemory(), otherInt32!.AsMemory(), resultInt32!.AsMemory());
 
     static void For<T>(ReadOnlySpan<T> left, ReadOnlySpan<T> right, Span<T> destination)
         where T : struct, IAdditionOperators<T, T, T>
@@ -274,6 +305,80 @@ public class AddBenchmarks
                 var rightSlice = right.Slice(start, length);
                 var destinationSlice = destination.Slice(start, length);
                 actions[index] = () => For_SIMD(leftSlice.Span, rightSlice.Span, destinationSlice.Span);
+
+                start += length;
+            }
+            Parallel.Invoke(actions);
+        }
+    }
+
+    static void Parallel_Invoke_System_Numerics_Tensors<T>(ReadOnlyMemory<T> left, ReadOnlyMemory<T> right, Memory<T> destination)
+        where T : struct, IAdditionOperators<T, T, T>, IAdditiveIdentity<T, T>
+    {
+        const int minChunkCount = 4;
+        const int minChunkSize = 1_000;
+
+        var coreCount = Environment.ProcessorCount;
+
+        if (coreCount >= minChunkCount && left.Length > minChunkCount * minChunkSize)
+            ParallelApply(left, right, destination, coreCount);
+        else
+            TensorPrimitives.Add(left.Span, right.Span, destination.Span);
+
+        static void ParallelApply(ReadOnlyMemory<T> left, ReadOnlyMemory<T> right, Memory<T> destination, int coreCount)
+        {
+            var totalSize = left.Length;
+            var chunkSize = int.Max(totalSize / coreCount, minChunkSize);
+
+            var actions = GC.AllocateArray<Action>(totalSize / chunkSize);
+            var start = 0;
+            for (var index = 0; index < actions.Length; index++)
+            {
+                var length = (index == actions.Length - 1)
+                    ? totalSize - start
+                    : chunkSize;
+
+                var leftSlice = left.Slice(start, length);
+                var rightSlice = right.Slice(start, length);
+                var destinationSlice = destination.Slice(start, length);
+                actions[index] = () => TensorPrimitives.Add(leftSlice.Span, rightSlice.Span, destinationSlice.Span);
+
+                start += length;
+            }
+            Parallel.Invoke(actions);
+        }
+    }
+
+    static void Parallel_Invoke_NetFabric_Numerics_Tensors<T>(ReadOnlyMemory<T> left, ReadOnlyMemory<T> right, Memory<T> destination)
+        where T : struct, IAdditionOperators<T, T, T>
+    {
+        const int minChunkCount = 4;
+        const int minChunkSize = 1_000;
+
+        var coreCount = Environment.ProcessorCount;
+
+        if (coreCount >= minChunkCount && left.Length > minChunkCount * minChunkSize)
+            ParallelApply(left, right, destination, coreCount);
+        else
+            TensorOperations.Add(left.Span, right.Span, destination.Span);
+
+        static void ParallelApply(ReadOnlyMemory<T> left, ReadOnlyMemory<T> right, Memory<T> destination, int coreCount)
+        {
+            var totalSize = left.Length;
+            var chunkSize = int.Max(totalSize / coreCount, minChunkSize);
+
+            var actions = GC.AllocateArray<Action>(totalSize / chunkSize);
+            var start = 0;
+            for (var index = 0; index < actions.Length; index++)
+            {
+                var length = (index == actions.Length - 1)
+                    ? totalSize - start
+                    : chunkSize;
+
+                var leftSlice = left.Slice(start, length);
+                var rightSlice = right.Slice(start, length);
+                var destinationSlice = destination.Slice(start, length);
+                actions[index] = () => TensorOperations.Add(leftSlice.Span, rightSlice.Span, destinationSlice.Span);
 
                 start += length;
             }
